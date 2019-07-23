@@ -1,0 +1,9 @@
+monitor:
+  name: ProducerConsumer
+  ip: localhost
+  maxPermits: 5
+  conditionVariablesCount: 2
+  proxy:
+    pubPort: 6000
+    subPort: 6001
+    checkIfAliveTime: 500
