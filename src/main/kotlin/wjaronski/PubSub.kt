@@ -3,7 +3,6 @@ package wjaronski
 
 import org.zeromq.ZMQ
 import org.zeromq.ZMQException
-import java.lang.Exception
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.streams.asSequence
@@ -30,7 +29,11 @@ private fun randomString(length: Long): String {
 
 val identifier = randomString(5)
 
-fun configurePublisher(context: ZMQ.Context, shouldEnd: AtomicBoolean): Pair<ZMQ.Socket, Thread> {
+fun configurePublisher(
+    context: ZMQ.Context,
+    shouldEnd: AtomicBoolean,
+    isProxyAlive: AtomicBoolean
+): Pair<ZMQ.Socket, Thread> {
     val socket = context.socket(ZMQ.PUB)
     socket.connect("tcp://*:6000")
 
@@ -42,7 +45,7 @@ fun configurePublisher(context: ZMQ.Context, shouldEnd: AtomicBoolean): Pair<ZMQ
             val msg2 = "topic B:\t$identifier $i"
 
             println("PUB\t$identifier\t${i++}")
-
+            while (!isProxyAlive.get());
             socket.sendMore("A") // topic
             socket.send(msg1)
             try {
@@ -54,6 +57,11 @@ fun configurePublisher(context: ZMQ.Context, shouldEnd: AtomicBoolean): Pair<ZMQ
         println("Publisher ended: $identifier")
 
     })
+}
+
+
+class Subscriber {
+
 }
 
 fun configureSubsriber(context: ZMQ.Context, shouldEnd: AtomicBoolean): Pair<ZMQ.Socket, Thread> {
@@ -80,12 +88,12 @@ fun configureSubsriber(context: ZMQ.Context, shouldEnd: AtomicBoolean): Pair<ZMQ
 }
 
 
-fun configureProxy(context: ZMQ.Context, shouldEnd: AtomicBoolean): Thread {
+fun configureProxy(context: ZMQ.Context, shouldEnd: AtomicBoolean, isProxyAlive: AtomicBoolean): Thread {
 
     return Thread {
         while (!shouldEnd.get()) {
             try {
-
+                isProxyAlive.set(false)
                 val xSub = context.socket(ZMQ.SUB)
                 xSub.bind("tcp://*:6000")
                 xSub.subscribe("".toByteArray())
@@ -93,9 +101,10 @@ fun configureProxy(context: ZMQ.Context, shouldEnd: AtomicBoolean): Thread {
                 val xPub = context.socket(ZMQ.PUB)
                 xPub.bind("tcp://*:6001")
                 println("Configuring proxy")
+                isProxyAlive.set(true)
                 ZMQ.proxy(xSub, xPub, null)
-
             } catch (e: ZMQException) { // proxy already configured
+                isProxyAlive.set(true)
             }
             try {
                 Thread.sleep(mainLoopSleepTime)
@@ -110,14 +119,15 @@ fun main() {
     val ctx = ZMQ.context(1)
 
     val shouldEnd = AtomicBoolean(false)
+    val isProxyAlive = AtomicBoolean(false)
 
-    configureProxy(ctx, shouldEnd).start()
-
-    val (pubSocket, pubTh) = configurePublisher(ctx, shouldEnd)
-    pubTh.start()
+    configureProxy(ctx, shouldEnd, isProxyAlive).start()
 
     val (subSocket, subTh) = configureSubsriber(ctx, shouldEnd)
+    val (pubSocket, pubTh) = configurePublisher(ctx, shouldEnd, isProxyAlive)
+
     subTh.start()
+    pubTh.start()
 
     var i = mainLoopIterations
     while (i-- > 0) {

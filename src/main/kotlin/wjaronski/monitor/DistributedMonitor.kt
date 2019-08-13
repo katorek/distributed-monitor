@@ -1,6 +1,5 @@
 package wjaronski.monitor
 
-import wjaronski.config.Configuration
 import wjaronski.config.MonitorDto
 import wjaronski.message.MessageHandler
 import java.util.concurrent.locks.Condition
@@ -24,11 +23,10 @@ class DistributedMonitor(
     }
 
 
-    override fun await(conditionVariableId: Int) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
+    override fun await(conditionVariableId: Int) = _conditionVariables[conditionVariableId].await()
 
     override fun signal(conditionVariableId: Int) {
+        _messageHandler
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
