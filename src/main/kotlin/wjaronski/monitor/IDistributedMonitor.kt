@@ -1,8 +1,6 @@
 package wjaronski.monitor
 
-import wjaronski.config.Configuration
-import wjaronski.config.MonitorDto
-import java.util.concurrent.locks.Condition
+import wjaronski.config.dto.MonitorDto
 
 interface IDistributedMonitor {
     val monitorDto: MonitorDto

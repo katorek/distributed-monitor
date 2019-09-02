@@ -1,9 +1,7 @@
 package wjaronski.monitor
 
-import wjaronski.config.MonitorDto
+import wjaronski.config.dto.MonitorDto
 import wjaronski.message.MessageHandler
-import java.util.concurrent.locks.Condition
-import java.util.concurrent.locks.ReentrantLock
 
 class DistributedMonitor(
     override val monitorDto: MonitorDto
@@ -13,20 +11,14 @@ class DistributedMonitor(
 //    override val conditionVariablesCount: Int
 ) : IDistributedMonitor {
 
-    private val _conditionVariables: List<Condition>
-    private val _messageHandler = MessageHandler(monitorDto)
-
-    init {
-        with(ReentrantLock()) {
-            _conditionVariables = generateSequence { newCondition() }.take(monitorDto.conditionVariablesCount).toList()
-        }
-    }
+    private val _locksManager = ConditionVariablesManager(monitorDto)
+    private val _messageHandler = MessageHandler(monitorDto, _locksManager)
 
 
-    override fun await(conditionVariableId: Int) = _conditionVariables[conditionVariableId].await()
+    override fun await(conditionVariableId: Int) = _locksManager[conditionVariableId].await()
 
     override fun signal(conditionVariableId: Int) {
-        _messageHandler
+        _messageHandler.signal(conditionVariableId)
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 

@@ -1,4 +1,4 @@
-package wjaronski.config
+package wjaronski.config.dto
 
 data class ProxyDto(
     val subPort: Int,
