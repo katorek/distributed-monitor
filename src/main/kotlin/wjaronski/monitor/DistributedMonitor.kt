@@ -17,8 +17,8 @@ class DistributedMonitor(
 
     override fun await(conditionVariableId: Int) = _locksManager[conditionVariableId].await()
 
-    override fun signal(conditionVariableId: Int) {
-        _messageHandler.signal(conditionVariableId)
+    override fun signal(conditionVariableId: Int, additionalMessage: String?) {
+        _messageHandler.signal(conditionVariableId, additionalMessage)
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 

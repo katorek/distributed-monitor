@@ -94,7 +94,7 @@ class MessageHandler (
         val socket = context.socket(SocketType.SUB)
         socket.connect("tcp://$localIp:$localPort")
         socket.subscribe(SUBSCRIBTION_TO_ALL_MSGS)
-        info(1, "initialized local subscriber for all incomin controll messages")
+        info(1, "initialized local subscriber for all incoming control messages")
 
         Thread {
             while (!shouldEnd.get()) {
@@ -145,8 +145,8 @@ class MessageHandler (
         }
     }
 
-    fun signal(conditionVariableId: Int) {
-        sendMessageToAll(SIGNAL, "$conditionVariableId")
+    fun signal(conditionVariableId: Int, additionalMessage: String?) {
+        sendMessageToAll(SIGNAL, "$conditionVariableId$MSG_DIVIDER$additionalMessage")
     }
 
     companion object {

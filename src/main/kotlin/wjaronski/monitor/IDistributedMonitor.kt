@@ -19,7 +19,7 @@ interface IDistributedMonitor {
 //    fun releaseExclusive()
 
     fun await(conditionVariableId: Int)
-    fun signal(conditionVariableId: Int)
+    fun signal(conditionVariableId: Int, additionalMessage: String?)
     fun signalAll(conditionVariableId: Int)
 
 }
