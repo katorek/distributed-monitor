@@ -14,18 +14,21 @@ class ProxyHandler(
 
     override fun run() {
         while (!shouldEnd.get()) {
+//            println("PROXY")
             with(monitorDto) {
                 try {
 
                     val xSub = context.socket(SocketType.SUB)
-                    xSub.bind("tcp://$ip:${proxy.subPort}")
+                    xSub.bind("tcp://*:${proxy.subPort}")
+//                    xSub.bind("tcp://$ip:${proxy.subPort}")
                     // forward all messages
                     xSub.subscribe("".toByteArray())
 
                     val xPub = context.socket(SocketType.PUB)
-                    xPub.bind("tcp://$ip:${proxy.pubPort}")
+                    xPub.bind("tcp://*:${proxy.pubPort}")
+//                    xPub.bind("tcp://$ip:${proxy.pubPort}")
 
-                    println("Proxy configured")
+//                    println("Proxy configured")
 
                     ZMQ.proxy(xSub, xPub, null)
 

@@ -48,6 +48,9 @@ fun configurePublisher(
             while (!isProxyAlive.get());
             socket.sendMore("A") // topic
             socket.send(msg1)
+            socket.sendMore("B") // topic
+            socket.send(msg2)
+
             try {
                 Thread.sleep(sendMessageTimeSleep)
             } catch (e: InterruptedException) {

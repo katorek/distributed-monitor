@@ -2,17 +2,15 @@ package wjaronski.monitor
 
 import wjaronski.config.dto.MonitorDto
 import wjaronski.message.MessageHandler
+import wjaronski.model.ModelDto
 
 class DistributedMonitor(
-    override val monitorDto: MonitorDto
-//    override val ip: String,
-//    override val monitorName: String,
-//    override val maxPermits: Int,
-//    override val conditionVariablesCount: Int
+    override val monitorDto: MonitorDto,
+    var model: ModelDto = ModelDto.CONSUMER
 ) : IDistributedMonitor {
 
     private val _locksManager = ConditionVariablesManager(monitorDto)
-    private val _messageHandler = MessageHandler(monitorDto, _locksManager)
+    private val _messageHandler = MessageHandler(monitorDto, _locksManager, model)
 
 
     override fun await(conditionVariableId: Int) = _locksManager[conditionVariableId].await()

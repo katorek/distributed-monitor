@@ -16,6 +16,6 @@ class ConditionVariablesManager(
     }
 
     operator fun get(id: Int): Condition {
-        return _conditionVariables.get(id)
+        return _conditionVariables[id]
     }
 }
