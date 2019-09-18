@@ -1,17 +1,17 @@
 package example
 
-import wjaronski.config.Configuration
 import wjaronski.model.ModelDto
-import wjaronski.monitor.DistributedMonitor
 
-class Consumer {
-    private val conf = Configuration.invoke()
-    private lateinit var monitor: DistributedMonitor
+class Consumer : ProdConsImpl(ModelDto.CONSUMER) {
 
-    init {
-        Thread {
-            monitor = DistributedMonitor(conf.settings.monitor, ModelDto.CONSUMER)
-        }.start()
+    override fun start() {
+        println("\tConsumer started")
+
+        super.start()
+    }
+
+    public fun consume() {
+
     }
 
 }

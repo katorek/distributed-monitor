@@ -1,18 +1,28 @@
 package example
 
+import java.util.*
+
 fun main() {
-//    val c = Consumer()
-//    val c = Consumer()
-    Consumer()
-    Consumer()
-    Consumer()
-    try {
-        Thread.sleep(5000);
-    } catch (e: Exception) {
+    val pc = Arrays.asList<IProdCons>(
+//        Consumer(),
+//        Consumer(),
+//        Consumer(),
+//        Consumer(),
+//        Producer(),
+//        Producer(),
+        Producer(),
+        Producer()
+    )
 
+
+    pc.forEach {
+
+        try {
+            it.start()
+            Thread.sleep(500)
+        } catch (e: Exception) {
+
+        }
     }
-//    val p = Producer()
-//    Prod
-
 
 }

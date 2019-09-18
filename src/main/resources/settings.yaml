@@ -3,6 +3,7 @@ monitor:
   ip: localhost
   maxPermits: 5
   conditionVariablesCount: 2
+  algorithm: wjaronski.algorithm.RicardAgrawalaAlgorithm
   proxy:
     pubPort: 6000
     subPort: 6001

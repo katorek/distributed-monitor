@@ -8,30 +8,36 @@ class LocalThread(
     val port: String,
     val context: ZMQ.Context
 ) : Comparable<LocalThread> {
-    override fun compareTo(other: LocalThread): Int {
-        if (this.equals(other)) return 0
-        return 1
+    constructor(address: MessageHandler.Companion.LocalAddress) : this(
+        address.host,
+        address.port.toString(),
+        address.context!!
+    )
+
+    override fun compareTo(o: LocalThread): Int {
+        val ips = ip.compareTo(o.ip)
+        val ports = port.compareTo(o.port)
+        if (ips == 0 && ports == 0) return 0
+        else if (ips == 0) return ports
+        return ips
     }
 
     private lateinit var socket: ZMQ.Socket
 
-//    companion object {
-//        @JvmField
-//        var context: ZMQ.Context? = null
-//
-//        fun setContext(ctx: ZMQ.Context) {
-//            context = ctx
-//        }
-//    }
 
     fun init(str: String) {
-        println("$str\t\tLOCALTHREAD\t$port")
+        println("$str\t\tLOCALTHREAD\t\t$port")
         initSocket()
     }
 
     fun sendMessage(msgType: String, msg: String) {
+//        if(socket == null ) initSocket()
         socket.sendMore(msgType)
         socket.send(msg)
+    }
+
+    fun sendMessage(msgType: MsgType, msg: String) {
+        sendMessage(msgType.toString(), msg)
     }
 
     private fun initSocket() {
@@ -58,6 +64,13 @@ class LocalThread(
     }
 
 
+    override fun toString(): String {
+        return "$ip:$port"
+    }
+
+    fun same(host: String, port: String): Boolean {
+        return (ip.equals(host) && this.port.equals(port))
+    }
 }
 
 

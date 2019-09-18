@@ -1,16 +1,31 @@
 package example
 
-import wjaronski.config.Configuration
 import wjaronski.model.ModelDto
-import wjaronski.monitor.DistributedMonitor
 
-class Producer {
-    private val conf = Configuration.invoke()
-    private lateinit var monitor: DistributedMonitor
+class Producer : ProdConsImpl(ModelDto.PRODUCER) {
 
-    init {
+
+    override fun start() {
+        println("\tProducer started")
+        super.start()
+//        super.run()
         Thread {
-            monitor = DistributedMonitor(conf.settings.monitor, ModelDto.PRODUCER)
+            sleep(5000)
+            while (true) {
+                println("Requesting CS")
+                produce()
+                sleep(3000)
+
+            }
         }.start()
     }
+
+    public fun produce() {
+        requestSC()
+        println("--------------------ENTERING CS------------------------")
+        sleep(6000)
+        println("++++++++++++++++++++LEAVING CS+++++++++++++++++++++++++")
+        releaseSC()
+    }
+
 }

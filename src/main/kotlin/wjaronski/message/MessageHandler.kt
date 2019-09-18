@@ -2,16 +2,18 @@ package wjaronski.message
 
 import org.zeromq.SocketType
 import org.zeromq.ZMQ
+import wjaronski.algorithm.IExclusionAlgorithm
 import wjaronski.config.Configuration
 import wjaronski.config.dto.MonitorDto
-import wjaronski.message.MessageHandler.Companion.MsgType.*
+import wjaronski.message.MsgType.*
 import wjaronski.model.ModelDto
 import wjaronski.monitor.ConditionVariablesManager
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
-class MessageHandler (
+class MessageHandler(
     private val monitorDto: MonitorDto,
     private val locksManager: ConditionVariablesManager,
     private val iAmProducer: ModelDto = ModelDto.CONSUMER
@@ -41,7 +43,9 @@ class MessageHandler (
     private val _otherThreads: ConcurrentSkipListSet<LocalThread> = ConcurrentSkipListSet()
     private val _conf = Configuration
 
-    private val nam: String = iAmProducer.toString() + "__" + _uuid
+    private val nam: String
+    private val msgQueue: ConcurrentLinkedQueue<Msg> = ConcurrentLinkedQueue()
+    var algorithm: IExclusionAlgorithm
 
     init {
 
@@ -56,18 +60,42 @@ class MessageHandler (
         _localIp = address.host
         _localPort = address.port
         _localSub = address.socket
+        nam = iAmProducer.toString() + "__" + _localPort
+        address.context = _context
+
+        val myThread = LocalThread(address)
+        myThread.init(nam)
+        _otherThreads.add(myThread)
+        val alg = _conf.invoke().settings.monitor.algorithm
+        val algClass = Class.forName(alg)
+        print("", "Using ${algClass.simpleName} as exclusion algorithm")
+
+        algorithm = algClass.constructors.first().newInstance(
+            msgQueue,
+            _otherThreads,
+            myThread,
+            locksManager
+        ) as IExclusionAlgorithm
+
         initAndStartLocalListenerThread()
         initAndStartProxyMessagesListenerThread()
 
 
         getCurrentListOfThreads()
-
-        startProducerConsumer()
+        algorithm.msgReplier()
     }
 
     private fun sleep(sec: Int) {
         try {
-            println("$nam\tSleeping $sec seconds\t\t\t\t\t\t\t\t:[${_otherThreads.size}]")
+            print(
+                "",
+                "Sleep[$sec]",
+                "",
+                "",
+                "",
+                _otherThreads.joinToString(";", "${_otherThreads.size.toString()} ->  {", "}")
+            )
+//            println("$nam\tSleeping $sec seconds\t\t\t\t\t\t\t\t:[${_otherThreads.size}]")
             Thread.sleep(sec * 1000L)
         } catch (e: InterruptedException) {
             error(e)
@@ -75,46 +103,18 @@ class MessageHandler (
 //        println("$nam\tWaked up after $sec seconds")
     }
 
-
     private fun sleepRandomTimeBetween(min: Int, max: Int) {
         sleep(ThreadLocalRandom.current().nextInt(min, max))
     }
 
-    private fun startProducerConsumer() {
-
-        while (!_shouldEnd.get()) {
-            // if im producer
-            //request CS every 5-10 sec
-
-            sleepRandomTimeBetween(5, 10)
-
-//            if(_otherThreads.size < 1) {
-//                getCurrentListOfThreads()
-//            }
-
-            when (iAmProducer) {
-                ModelDto.PRODUCER -> { //producer
-//                    println("$nam\tProducing...${_otherThreads.size}")
-//                    _publisherSocket.send()
-                    sendMessageToAll(CS_REQUEST, "eee makarena xD")
-
-                }
-                ModelDto.CONSUMER -> { //consumer
-//                    println("$nam\tConsuming...${_otherThreads.size}")
-                }
-            }
-        }
-
-    }
-
     private fun initAndStartProxyMessagesListenerThread() {
         Thread {
-            //            info(1, "initAndStartProxyMessagesListenerThread")
             while (!_shouldEnd.get()) {
                 val topic = _subscriberSocket.recvStr()
                 val content = _subscriberSocket.recvStr()
-                info(1, "$nam\t\t\tPROXY\t\t\t$topic -> $content")
-                when(topic) {
+                print("PROXY", topic, content)
+
+                when (topic) {
                     MESSAGE_NEW_THREAD -> {
                         val (ip, port) = content.split(MSG_DIVIDER)
                         val dto = LocalThread(ip, port, _context)
@@ -143,20 +143,14 @@ class MessageHandler (
 
     private fun initAndStartLocalListenerThread() {
         val socket = _localSub
-//        val socket = _context.socket(SocketType.SUB)
-//        info(1, "tcp://$_localIp:$_localPort")
-//        socket.connect("tcp://*:$_localPort")
-//        socket.connect("tcp://$_localIp:$_localPort")
-//        socket.subscribe("".toByteArray())
-//        info(1, "initialized local subscriber for all incoming control messages")
 
         Thread {
             while (!_shouldEnd.get()) {
-//                val (msgType, msg) = socket.recvStr().split(MSG_DIVIDER)
                 val msgType = socket.recvStr()
                 val msg = socket.recvStr()
-                println("$nam\t\t\tLOCAL\t\t\t$msgType $msg")
-                info(1, "$msgType, $msg")
+                print("LOCAL", msgType, msg)
+                msgQueue.add(Msg(msgType, msg))
+
                 when (valueOf(msgType)) {
 //                    MESSAGE_NEW_THREAD -> {
 
@@ -169,6 +163,9 @@ class MessageHandler (
                     }
                     CS_REQUEST -> {
 //                        println("$nam\t\t${CS_REQUEST}\t\t$msg")
+                    }
+                    else -> {
+
                     }
                 }
 
@@ -185,66 +182,65 @@ class MessageHandler (
 //        return LocalAddress(InetAddress.getLocalHost().hostAddress, port)
     }
 
-    private fun info(level: Int, str: String) {
-        if (INFO_LEVEL >= level) println(str)
+    private fun print(vararg msgs: String) {
+//        println(msgs.fold("$nam\t\t\t") { s1, s2 -> "$s1\t\t$s2" })
+    }
+
+    private fun info(level: Int, m1: String, m2: String = "", m3: String = "") {
+        if (INFO_LEVEL >= level) println("$nam\t\t\t$m1\t\t$m2\t\t$m3")
     }
 
     private fun getCurrentListOfThreads() {
-        info(1, "$nam\t\t\t\t\t\t\t\t'$_localIp:$_localPort'")
-        _publisherSocket.sendMore(MESSAGE_NEW_THREAD)
-        _publisherSocket.send("$_localIp$MSG_DIVIDER$_localPort")
+        Thread {
+            print("", "", "'$_localIp:$_localPort'")
+            _publisherSocket.sendMore(MESSAGE_NEW_THREAD)
+            _publisherSocket.send("$_localIp$MSG_DIVIDER$_localPort")
+
+            while (_otherThreads.size < 2) {
+                sleepRandomTimeBetween(1, 2)
+                _publisherSocket.sendMore(MESSAGE_NEW_THREAD)
+                _publisherSocket.send("$_localIp$MSG_DIVIDER$_localPort")
+            }
+        }.start()
     }
 
     private fun monitorPublisherSocket(): ZMQ.Socket {
         with(monitorDto) {
             val socket = _context.socket(SocketType.PUB)
             socket.connect("tcp://*:${proxy.subPort}")
-//            socket.connect("tcp://$ip:${proxy.subPort}")
-//            info(1, "tcp://*:${proxy.subPort}")
-//            info(1, "Created Publisher Socket")
             return socket
         }
     }
 
     private fun monitorSubscriberSocket(): ZMQ.Socket {
-        with(monitorDto){
+        with(monitorDto) {
             val socket = _context.socket(SocketType.SUB)
             socket.connect("tcp://*:${proxy.pubPort}")
-//            socket.connect("tcp://$ip:${proxy.pubPort}")
-//            socket.subscribe(name)
             socket.subscribe("".toByteArray())
-//            info(1, "tcp://$ip:${proxy.pubPort}")
-//            info(1, "Created Subscriber Socket, Subject '$name'")
             return socket
         }
     }
 
     fun sendMessageToAll(messageType: MsgType, message: String) {
-        info(1, "$nam\t\t\t\t\t\t\t\t\t\t\t\t\t\tSending to all: '$messageType;$message'")
+        print("", "Send All", "", "'$messageType;$message'")
         _otherThreads.forEach {
             it.sendMessage(messageType.toString(), message)
         }
     }
 
     fun signal(conditionVariableId: Int, additionalMessage: String?) {
-        sendMessageToAll(SIGNAL, "$conditionVariableId$MSG_DIVIDER$additionalMessage")
+        sendMessageToAll(MsgType.SIGNAL, "$conditionVariableId$MSG_DIVIDER$additionalMessage")
     }
 
     companion object {
         data class LocalAddress(
             val host: String,
             val port: Int,
-            val socket: ZMQ.Socket
+            val socket: ZMQ.Socket,
+            var context: ZMQ.Context? = null
         )
 
-        enum class MsgType {
-            SIGNAL,
-            SIGNAL_ALL,
-            ACQUIRE,
-            RELEASE,
-            CS_REQUEST, // CS = Critical Section
-            CS_REPLY
-        }
     }
+
 
 }
