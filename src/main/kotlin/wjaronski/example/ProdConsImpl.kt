@@ -1,4 +1,4 @@
-package example
+package wjaronski.example
 
 import wjaronski.config.Configuration
 import wjaronski.model.ModelDto

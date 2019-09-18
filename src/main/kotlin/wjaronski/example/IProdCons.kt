@@ -1,4 +1,4 @@
-package example
+package wjaronski.example
 
 interface IProdCons {
     fun start()

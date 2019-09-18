@@ -1,4 +1,4 @@
-package example
+package wjaronski.example
 
 import java.util.*
 
