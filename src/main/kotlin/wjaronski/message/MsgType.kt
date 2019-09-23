@@ -6,5 +6,6 @@ enum class MsgType {
     ACQUIRE,
     RELEASE,
     CS_REQUEST, // CS = Critical Section
-    CS_REPLY
+    CS_REPLY,
+    UPDATE_DATA
 }

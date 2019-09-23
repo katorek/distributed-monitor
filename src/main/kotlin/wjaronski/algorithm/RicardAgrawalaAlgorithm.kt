@@ -1,5 +1,6 @@
 package wjaronski.algorithm
 
+import kotlinx.coroutines.channels.Channel
 import wjaronski.message.LocalThread
 import wjaronski.message.LogicalClock
 import wjaronski.message.Msg
@@ -9,22 +10,25 @@ import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 class RicardAgrawalaAlgorithm(
     override val msgQueue: ConcurrentLinkedQueue<Msg>,
     override val threads: ConcurrentSkipListSet<LocalThread>,
     override val myThread: LocalThread,
-    override val locksManager: ConditionVariablesManager
+    override val locksManager: ConditionVariablesManager,
+    override var sharedData: Any
 ) : IExclusionAlgorithm {
     private val requestingCS = AtomicBoolean(false)
     private var requestingClock: Long = 0
     private val threadsWaitingForReply: LinkedList<LocalThread> = LinkedList()
     private val waitingForRepliesFromThreads: LinkedList<LocalThread> = LinkedList()
+    private val clock = LogicalClock()
 
-    override fun requestCS() {
+    override fun requestCS(data: Any?) {
         requestingCS.set(true)
         requestingClock = clock.next()
-        val msg = "$requestingClock;$myThread".also { println() }
+        val msg = "$requestingClock;$myThread;$data".also { println() }
 
         waitingForRepliesFromThreads.addAll(threads)
         waitingForRepliesFromThreads.remove(myThread)
@@ -36,7 +40,7 @@ class RicardAgrawalaAlgorithm(
 
         while (waitingForRepliesFromThreads.isNotEmpty()) {
             println(
-                "Waiting...[${waitingForRepliesFromThreads.size} -> ${waitingForRepliesFromThreads.joinToString(
+                "Waiting...{$requestingClock}\t[${waitingForRepliesFromThreads.size} -> ${waitingForRepliesFromThreads.joinToString(
                     ", ",
                     "{",
                     "}"
@@ -45,25 +49,30 @@ class RicardAgrawalaAlgorithm(
             Thread.sleep(1000)
         }
         println("\t\t$myThread\t\tcan enter CS")
+        clock.next()
     }
 
-    override fun releaseCS() {
+    override fun releaseCS(data: Any?) {
+        println("Releasing $data")
         synchronized(threadsWaitingForReply) {
+            if(data != null) {
+                sharedData = data
+                threads.forEach { it.sendMessage(MsgType.UPDATE_DATA, data.toString()) }
+            }
+            requestingCS.set(false)
             threadsWaitingForReply.forEach { sendReply(it) }
             threadsWaitingForReply.clear()
         }
-        requestingCS.set(false)
     }
 
-    private val clock = LogicalClock()
-
     private fun threadFrom(host: String, port: String): LocalThread? {
-        val olc = threads.stream().filter { it.same(host, port) }.findFirst()
-        return olc.orElse(null)
+        return threads.stream()
+            .filter { it.same(host, port) }
+            .findFirst()
+            .orElse(null)
     }
 
     private fun threadFrom(str: List<String>): LocalThread {
-
         return threadFrom(str[0], str[1])!!
     }
 
@@ -74,7 +83,8 @@ class RicardAgrawalaAlgorithm(
     }
 
     override fun msgReplier() {
-        Thread {
+
+        thread(start = true) {
             while (true) {
                 if (msgQueue.size > 0) {
                     with(msgQueue.poll()) {
@@ -140,7 +150,7 @@ class RicardAgrawalaAlgorithm(
                     }
                 }
             }
-        }.start()
+        }
     }
 
 }

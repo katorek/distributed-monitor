@@ -6,17 +6,18 @@ import wjaronski.algorithm.IExclusionAlgorithm
 import wjaronski.config.Configuration
 import wjaronski.config.dto.MonitorDto
 import wjaronski.message.MsgType.*
-import wjaronski.model.ModelDto
 import wjaronski.monitor.ConditionVariablesManager
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 class MessageHandler(
     private val monitorDto: MonitorDto,
     private val locksManager: ConditionVariablesManager,
-    private val iAmProducer: ModelDto = ModelDto.CONSUMER
+    private val name: String,
+    @Volatile var sharedData: Any
 ) {
 
     private val _uuid: String = "${ThreadLocalRandom.current().nextInt(10, 99)}"
@@ -30,7 +31,6 @@ class MessageHandler(
 
 
     private val _context: ZMQ.Context
-    private val _proxyThread: Thread
     private val _shouldEnd = AtomicBoolean(false)
 
     private val _subscriberSocket: ZMQ.Socket
@@ -50,7 +50,7 @@ class MessageHandler(
     init {
 
         _context = ZMQ.context(10)
-        _proxyThread = Thread(ProxyHandler(_context, _shouldEnd, monitorDto))
+        var _proxyThread = Thread(ProxyHandler(_context, _shouldEnd, monitorDto))
         _proxyThread.start()
 
         _publisherSocket = monitorPublisherSocket()
@@ -60,7 +60,7 @@ class MessageHandler(
         _localIp = address.host
         _localPort = address.port
         _localSub = address.socket
-        nam = iAmProducer.toString() + "__" + _localPort
+        nam = "${name}__$_localPort"
         address.context = _context
 
         val myThread = LocalThread(address)
@@ -74,7 +74,8 @@ class MessageHandler(
             msgQueue,
             _otherThreads,
             myThread,
-            locksManager
+            locksManager,
+            sharedData
         ) as IExclusionAlgorithm
 
         initAndStartLocalListenerThread()
@@ -144,12 +145,27 @@ class MessageHandler(
     private fun initAndStartLocalListenerThread() {
         val socket = _localSub
 
-        Thread {
+        thread(start = true) {
             while (!_shouldEnd.get()) {
                 val msgType = socket.recvStr()
                 val msg = socket.recvStr()
-                print("LOCAL", msgType, msg)
-                msgQueue.add(Msg(msgType, msg))
+//                print("LOCAL", msgType, msg)
+                when (valueOf(msgType)) {
+                    CS_REQUEST -> {
+                        msgQueue.add(Msg(msgType, msg))
+                    }
+                    CS_REPLY -> {
+                        msgQueue.add(Msg(msgType, msg))
+                    }
+                    UPDATE_DATA -> {
+                        println("$nam\tUPDATING_DATA with: $msg")
+                        sharedData = msg
+                    }
+                    else -> {
+
+                    }
+                }
+//                msgQueue.add(Msg(msgType, msg))
 
                 when (valueOf(msgType)) {
 //                    MESSAGE_NEW_THREAD -> {
@@ -170,13 +186,13 @@ class MessageHandler(
                 }
 
             }
-        }.start()
+        }
     }
 
     private fun initLocalAddress(): LocalAddress {
         val localSubscriber = _context.socket(SocketType.SUB)
         val port = localSubscriber.bindToRandomPort("tcp://*")
-        localSubscriber.subscribe("".toByteArray())
+        localSubscriber.subscribe(SUBSCRIBTION_TO_ALL_MSGS)
 //        info(2, "${InetAddress.getLocalHost().hostAddress}:$port")
         return LocalAddress("localhost", port, localSubscriber)
 //        return LocalAddress(InetAddress.getLocalHost().hostAddress, port)
@@ -191,17 +207,18 @@ class MessageHandler(
     }
 
     private fun getCurrentListOfThreads() {
-        Thread {
+        thread(start = true) {
             print("", "", "'$_localIp:$_localPort'")
             _publisherSocket.sendMore(MESSAGE_NEW_THREAD)
             _publisherSocket.send("$_localIp$MSG_DIVIDER$_localPort")
-
+            println("${_otherThreads.size}")
             while (_otherThreads.size < 2) {
+                println("${_otherThreads.size}")
                 sleepRandomTimeBetween(1, 2)
                 _publisherSocket.sendMore(MESSAGE_NEW_THREAD)
                 _publisherSocket.send("$_localIp$MSG_DIVIDER$_localPort")
             }
-        }.start()
+        }
     }
 
     private fun monitorPublisherSocket(): ZMQ.Socket {
@@ -216,7 +233,7 @@ class MessageHandler(
         with(monitorDto) {
             val socket = _context.socket(SocketType.SUB)
             socket.connect("tcp://*:${proxy.pubPort}")
-            socket.subscribe("".toByteArray())
+            socket.subscribe(SUBSCRIBTION_TO_ALL_MSGS)
             return socket
         }
     }

@@ -1,31 +1,43 @@
 package wjaronski.example
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import wjaronski.model.ModelDto
+import kotlin.concurrent.thread
 
-class Producer : ProdConsImpl(ModelDto.PRODUCER) {
-
+class Producer :
+    ProdConsImpl(ModelDto.PRODUCER, sharedData = Data()) {
 
     override fun start() {
         println("\tProducer started")
         super.start()
-//        super.run()
-        Thread {
+        thread(start = true){
             sleep(5000)
             while (true) {
                 println("Requesting CS")
                 produce()
-                sleep(3000)
-
+                sleep(4000)
             }
-        }.start()
+        }
     }
 
-    public fun produce() {
+    fun produce() {
         requestSC()
-        println("--------------------ENTERING CS------------------------")
-        sleep(6000)
-        println("++++++++++++++++++++LEAVING CS+++++++++++++++++++++++++")
-        releaseSC()
+        var data = actualData
+        println("--------------------ENTERING CS------------------------\tS$sharedData\tA$actualData")
+        if(data.stack.empty()) {
+            data.stack.push("Item_1")
+        } else {
+            val int = data.stack.lastElement().last().toInt() + 1
+            data.stack.push("Item_${int}")
+        }
+        sleep(1000)
+        data.updated.set(true)
+        println("++++++++++++++++++++LEAVING CS+++++++++++++++++++++++++\tS$sharedData\tA$actualData")
+        releaseSC(data)
+        actualData.updated.set(false)
+//        data.updated.set(false)
     }
 
 }

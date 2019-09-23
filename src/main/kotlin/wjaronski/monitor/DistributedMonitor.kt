@@ -1,16 +1,18 @@
 package wjaronski.monitor
 
+import kotlinx.coroutines.channels.Channel
 import wjaronski.config.dto.MonitorDto
 import wjaronski.message.MessageHandler
-import wjaronski.model.ModelDto
 
 class DistributedMonitor(
     override val monitorDto: MonitorDto,
-    var model: ModelDto = ModelDto.CONSUMER
+    val name: String,
+    val sharedData: Any
+
 ) : IDistributedMonitor {
 
     private val _locksManager = ConditionVariablesManager(monitorDto)
-    private val _messageHandler = MessageHandler(monitorDto, _locksManager, model)
+    private val _messageHandler = MessageHandler(monitorDto, _locksManager, name, sharedData)
 
 
     override fun await(conditionVariableId: Int) = _locksManager[conditionVariableId].await()
@@ -32,12 +34,20 @@ class DistributedMonitor(
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    fun requestCS() {
-        _messageHandler.algorithm.requestCS()
+    fun requestCS(data: Any? = null) {
+        if (data != null) {
+            _messageHandler.algorithm.requestCS()
+        }
+        _messageHandler.algorithm.requestCS(data)
     }
 
-    fun releaseSC() {
-        _messageHandler.algorithm.releaseCS()
+    fun releaseSC(data: Any? = null) {
+        if (data != null) {
+            _messageHandler.algorithm.releaseCS()
+        }
+        _messageHandler.algorithm.releaseCS(data)
     }
+
+//    fun
 
 }

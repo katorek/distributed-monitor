@@ -8,8 +8,8 @@ fun main() {
 //        Consumer(),
 //        Consumer(),
 //        Consumer(),
-//        Producer(),
-//        Producer(),
+        Producer(),
+        Producer(),
         Producer(),
         Producer()
     )
