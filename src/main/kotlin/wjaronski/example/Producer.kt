@@ -1,9 +1,7 @@
 package wjaronski.example
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
 import wjaronski.model.ModelDto
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class Producer :
@@ -24,8 +22,9 @@ class Producer :
 
     fun produce() {
         requestSC()
-        var data = actualData
-        println("--------------------ENTERING CS------------------------\tS$sharedData\tA$actualData")
+        var data = Data(updated = AtomicBoolean(actualData.updated.get()), stack = (actualData.stack))
+//        var data = actualData
+        println("--------------------ENTERING CS------------------------\tS$sharedData\tA$actualData\tData:$data")
         if(data.stack.empty()) {
             data.stack.push("Item_1")
         } else {
@@ -34,7 +33,7 @@ class Producer :
         }
         sleep(1000)
         data.updated.set(true)
-        println("++++++++++++++++++++LEAVING CS+++++++++++++++++++++++++\tS$sharedData\tA$actualData")
+        println("++++++++++++++++++++LEAVING CS+++++++++++++++++++++++++\tS$sharedData\tA$actualData\tData:$data")
         releaseSC(data)
         actualData.updated.set(false)
 //        data.updated.set(false)
